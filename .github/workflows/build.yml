@@ -100,7 +100,6 @@ jobs:
           exportToken: false
           secrets: |
             secret/data/datacosmos/global/system/rpm-signing private | GPG_PRIVATE_KEY ;
-            secret/data/datacosmos/global/system/rpm-signing passphrase | GPG_PASSPHRASE ;
             secret/data/datacosmos/global/system/rpm-signing keyname | GPG_KEY_NAME
 
       - name: Sign RPMs (inside OL8 container)
@@ -157,8 +156,7 @@ jobs:
           jwtGithubAudience: https://github.com/datacosmos-br
           exportToken: false
           secrets: |
-            secret/data/datacosmos/global/system/rpm-signing private | GPG_PRIVATE_KEY ;
-            secret/data/datacosmos/global/system/rpm-signing passphrase | GPG_PASSPHRASE
+            secret/data/datacosmos/global/system/rpm-signing private | GPG_PRIVATE_KEY
       - name: Build public repo tree
         run: RPMS_DIR=dist SITE=public EL=el8 bash scripts/make-repo.sh
       - name: Upload Pages artifact

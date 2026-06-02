@@ -45,11 +45,14 @@ if [ -n "${MIRROR_BASE:-}" ]; then
   KEYDIR="${KEYDIR:-/specs/${PKG}/keys}"
   [ -f "$CHECKSUMS" ] || { echo "FATAL: checksum manifest ${CHECKSUMS} missing"; exit 1; }
   sha256sum -c --ignore-missing "$CHECKSUMS" || { echo "FATAL: SHA-256 mismatch vs ${CHECKSUMS} — tampered mirror"; exit 1; }
-  for k in "$KEYDIR"/RPM-GPG-KEY*; do [ -f "$k" ] && rpm --import "$k"; done
+  imported=0
+  for k in "$KEYDIR"/RPM-GPG-KEY*; do [ -f "$k" ] || continue; rpm --import "$k"; imported=$((imported+1)); done
+  [ "$imported" -gt 0 ] || { echo "FATAL: no elrepo keys imported from ${KEYDIR} — cannot verify"; exit 1; }
   for r in kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm; do
-    rpm -K "$r" 2>&1 | grep -qiE 'pgp.*(ok|OK)|digests signatures ok|signatures ok' \
-      || { echo "FATAL: elrepo GPG verification FAILED for $r"; rpm -K "$r"; exit 1; }
-    echo "OK $r — elrepo GPG verified + SHA-256 pinned"
+    out="$(LC_ALL=C rpm -Kv "$r" 2>&1)" || { echo "FATAL: rpm -K errored for $r"; echo "$out"; exit 1; }
+    echo "$out" | grep -qE 'NOKEY|NOT OK|MISSING KEYS' && { echo "FATAL: $r failed elrepo GPG verify:"; echo "$out"; exit 1; }
+    echo "$out" | grep -qE '(RSA|DSA)/SHA[0-9]+ Signature.*: OK' || { echo "FATAL: no good elrepo signature line for $r:"; echo "$out"; exit 1; }
+    echo "OK $r — elrepo GPG verified (RSA/DSA signature OK) + SHA-256 pinned"
   done
   cp kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm "$OUT"/
   echo "== mirror artifacts (elrepo-signed; workflow re-signs with Datacosmos key) ==" && ls -1 "$OUT"
