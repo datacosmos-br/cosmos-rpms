@@ -1,0 +1,15 @@
+# cosmos-rpms package manifest — kernel-ml (clean LTS kernel for OKE el8 nodes, ADR-087).
+# The build matrix in .github/workflows/build.yml is generated from these manifests.
+package: kernel-ml
+summary: >-
+  Clean mainline-stable LTS kernel (6.12, below the (6.14, 7.0.10] BPF-JIT/verifier regression that
+  wedges cilium/coroot eBPF). Rebuilt from the elrepo kernel-ml spec + kernel.org tarball.
+el: el8
+dist: .el8.elrepo
+# upstream spec donor (elrepo/kernel). x86_64 config donor is el8; aarch64 has no el8 config -> el9 donor.
+specSource: elrepo/kernel:kernel-ml/el8/kernel-ml-7.0.spec
+versions:
+  - "6.12.92"
+arches:
+  - x86_64
+  - aarch64

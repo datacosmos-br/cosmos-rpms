@@ -1,0 +1,160 @@
+# cosmos-rpms — build (OL8 container, multi-arch) -> GPG-sign (key from Vault via GitHub OIDC) ->
+# GitHub Release -> publish public dnf repo to GitHub Pages. No GPG key ever stored in GitHub.
+name: build-and-publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - specs/**
+      - build/**
+      - scripts/**
+      - .github/workflows/build.yml
+  workflow_dispatch:
+    inputs:
+      package:
+        description: package name (default kernel-ml)
+        required: false
+      version:
+        description: version (default from package.yaml)
+        required: false
+
+permissions:
+  contents: write      # create GitHub Releases
+  pages: write         # deploy Pages
+  id-token: write      # GitHub OIDC -> Vault AND Pages deploy
+
+env:
+  VAULT_ADDR: https://vault.datacosmos.com.br
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build matrix from specs/*/package.yaml
+        id: gen
+        env:
+          ONLY_PKG: ${{ github.event.inputs.package }}
+          ONLY_VER: ${{ github.event.inputs.version }}
+        run: |
+          if ! command -v yq >/dev/null 2>&1; then
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+          items='[]'
+          for pf in specs/*/package.yaml; do
+            pkg=$(yq -r '.package' "$pf"); el=$(yq -r '.el' "$pf"); dist=$(yq -r '.dist' "$pf")
+            [ -n "$ONLY_PKG" ] && [ "$ONLY_PKG" != "$pkg" ] && continue
+            for v in $(yq -r '.versions[]' "$pf"); do
+              [ -n "$ONLY_VER" ] && [ "$ONLY_VER" != "$v" ] && continue
+              for a in $(yq -r '.arches[]' "$pf"); do
+                runner=ubuntu-latest; [ "$a" = "aarch64" ] && runner=ubuntu-24.04-arm
+                items=$(echo "$items" | yq -o=json -I=0 ". + [{\"pkg\":\"$pkg\",\"version\":\"$v\",\"arch\":\"$a\",\"el\":\"$el\",\"dist\":\"$dist\",\"runner\":\"$runner\"}]")
+              done
+            done
+          done
+          echo "matrix={\"include\":$items}" >> "$GITHUB_OUTPUT"
+          echo "$items"
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune -af || true; df -h /
+
+      - name: Build builder image
+        run: docker build -t cosmos-rpms-builder -f build/Containerfile .
+
+      - name: Build RPMs (${{ matrix.pkg }} ${{ matrix.version }} ${{ matrix.arch }})
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" \
+            -e PKG='${{ matrix.pkg }}' -e VERSION='${{ matrix.version }}' \
+            -e ARCH='${{ matrix.arch }}' -e EL='${{ matrix.el }}' -e DIST='${{ matrix.dist }}' \
+            cosmos-rpms-builder
+
+      - name: Read RPM signing key from Vault (GitHub OIDC)
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          path: jwt-github
+          role: cosmos-rpms-ci
+          jwtGithubAudience: https://github.com/datacosmos-br
+          exportToken: false
+          secrets: |
+            secret/data/datacosmos/global/system/rpm-signing private | GPG_PRIVATE_KEY ;
+            secret/data/datacosmos/global/system/rpm-signing passphrase | GPG_PASSPHRASE ;
+            secret/data/datacosmos/global/system/rpm-signing keyname | GPG_KEY_NAME
+
+      - name: Sign RPMs (inside OL8 container)
+        run: |
+          docker run --rm -v "$PWD/out:/out" -v "$PWD/scripts:/scripts" \
+            -e GPG_PRIVATE_KEY -e GPG_PASSPHRASE -e GPG_KEY_NAME \
+            --entrypoint /bin/bash cosmos-rpms-builder /scripts/sign-rpm.sh /out/*.rpm
+
+      - name: Upload signed RPMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-${{ matrix.pkg }}-${{ matrix.version }}-${{ matrix.arch }}
+          path: out/*.rpm
+          retention-days: 3
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, pattern: 'rpms-*', merge-multiple: true }
+      - name: Create/update GitHub Release (tag = main package NVR)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          main=$(find dist -maxdepth 1 -name 'kernel-ml-*-1.*.rpm' ! -name '*-core-*' ! -name '*-modules-*' | head -1)
+          [ -n "$main" ] || { echo "no kernel-ml main RPM found"; exit 1; }
+          tag=$(basename "$main" | sed -E 's/\.(x86_64|aarch64)\.rpm$//')
+          gh release view "$tag" >/dev/null 2>&1 || \
+            gh release create "$tag" --title "$tag" --notes "Datacosmos custom RPM $tag (GPG-signed)."
+          gh release upload "$tag" dist/*.rpm --clobber
+
+  pages:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, pattern: 'rpms-*', merge-multiple: true }
+      - name: Install tooling
+        run: sudo apt-get update -y >/dev/null && sudo apt-get install -y createrepo-c rpm gnupg2 >/dev/null
+      - name: Read signing key from Vault (to sign repomd)
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          path: jwt-github
+          role: cosmos-rpms-ci
+          jwtGithubAudience: https://github.com/datacosmos-br
+          exportToken: false
+          secrets: |
+            secret/data/datacosmos/global/system/rpm-signing private | GPG_PRIVATE_KEY ;
+            secret/data/datacosmos/global/system/rpm-signing passphrase | GPG_PASSPHRASE
+      - name: Build public repo tree
+        run: RPMS_DIR=dist SITE=public EL=el8 bash scripts/make-repo.sh
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with: { path: public }
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,10 @@
+# cosmos-rpms builder — Oracle Linux 8, the ABI target for the OKE nodes. The actual build logic is
+# scripts/build-rpm.sh (mounted/copied in by CI). This image only bootstraps the toolchain; the
+# package's full BuildRequires are installed at build time via `dnf builddep` on the elrepo spec.
+FROM oraclelinux:8
+RUN dnf -y install dnf-plugins-core && dnf config-manager --set-enabled ol8_codeready_builder || true
+RUN dnf -y install rpm-build rpm-sign make gcc curl xz cpio tar findutils gawk sed diffutils which \
+      gzip bzip2 zstd hostname gnupg2 createrepo_c && dnf clean all
+COPY scripts/build-rpm.sh /usr/local/bin/build-rpm.sh
+RUN chmod +x /usr/local/bin/build-rpm.sh
+ENTRYPOINT ["/usr/local/bin/build-rpm.sh"]
