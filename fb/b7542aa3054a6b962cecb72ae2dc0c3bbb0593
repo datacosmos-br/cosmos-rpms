@@ -1,0 +1,19 @@
+.github/workflows/build.yml
+  s_bef51d6362d23c::t_4c07e2e3aa7e63 110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fbb7542aa3054a6b962cecb72ae2dc0c3bbb0593",
+  "prompts": {},
+  "sessions": {
+    "s_bef51d6362d23c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e341287c-1216-4fc3-a400-f6e9d5e10220",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Zed <hi@zed.dev>"
+    }
+  }
+}
