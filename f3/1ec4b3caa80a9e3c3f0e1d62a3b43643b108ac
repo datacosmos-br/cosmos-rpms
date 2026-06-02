@@ -1,0 +1,23 @@
+scripts/build-rpm.sh
+  s_bef51d6362d23c::t_3640811d58b7f3 38-47,52-54
+.github/workflows/build.yml
+  s_bef51d6362d23c::t_a3cec2fa45adc9 85
+specs/kernel-ml/checksums-el8.sha256
+  s_bef51d6362d23c::t_7a42e6988af4a6 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f31ec4b3caa80a9e3c3f0e1d62a3b43643b108ac",
+  "prompts": {},
+  "sessions": {
+    "s_bef51d6362d23c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e341287c-1216-4fc3-a400-f6e9d5e10220",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Zed <hi@zed.dev>"
+    }
+  }
+}
