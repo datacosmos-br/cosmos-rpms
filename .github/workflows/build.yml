@@ -104,9 +104,10 @@ jobs:
 
       - name: Sign RPMs (inside OL8 container)
         run: |
+          # bash -c so the /out/*.rpm glob expands INSIDE the container (where /out exists), not on the runner
           docker run --rm -v "$PWD/out:/out" -v "$PWD/scripts:/scripts" \
-            -e GPG_PRIVATE_KEY -e GPG_PASSPHRASE -e GPG_KEY_NAME \
-            --entrypoint /bin/bash cosmos-rpms-builder /scripts/sign-rpm.sh /out/*.rpm
+            -e GPG_PRIVATE_KEY -e GPG_KEY_NAME \
+            --entrypoint /bin/bash cosmos-rpms-builder -c '/scripts/sign-rpm.sh /out/*.rpm'
 
       - name: Upload signed RPMs
         uses: actions/upload-artifact@v4
