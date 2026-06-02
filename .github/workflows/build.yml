@@ -77,11 +77,14 @@ jobs:
         run: docker build -t cosmos-rpms-builder -f build/Containerfile .
 
       - name: Build RPMs (${{ matrix.pkg }} ${{ matrix.version }} ${{ matrix.arch }})
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # raises the elrepo GitHub-API discovery rate limit
         run: |
           mkdir -p out
           docker run --rm -v "$PWD/out:/out" \
             -e PKG='${{ matrix.pkg }}' -e VERSION='${{ matrix.version }}' \
             -e ARCH='${{ matrix.arch }}' -e EL='${{ matrix.el }}' -e DIST='${{ matrix.dist }}' \
+            -e GITHUB_TOKEN \
             cosmos-rpms-builder
 
       - name: Read RPM signing key from Vault (GitHub OIDC)

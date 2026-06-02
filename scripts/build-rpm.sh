@@ -48,6 +48,10 @@ if [ "$ARCH" = "aarch64" ]; then
   sed -i '1i %define zipmodules 0' ~/rpmbuild/SPECS/kernel-ml.spec
   sed -i '1i %define with_vdso_install 0' ~/rpmbuild/SPECS/kernel-ml.spec
 fi
+# The elrepo spec's %prep aborts if `make listnewconfig` finds ANY new option (elrepo hand-maintains
+# byte-exact configs; ours is donor-derived). Inject `make olddefconfig` right after the .config copy so
+# new options take upstream defaults and the gate passes — we accept defaults for the version delta.
+sed -i 's@^%{__cp} config-%{version}-%{_target_cpu} .config@&\n%{__make} -s ARCH=%{_target_cpu} olddefconfig@' ~/rpmbuild/SPECS/kernel-ml.spec
 
 # 3) all elrepo BuildRequires, exactly as the spec declares them
 dnf -y config-manager --set-enabled ol8_codeready_builder >/dev/null 2>&1 || true
