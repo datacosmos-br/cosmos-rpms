@@ -1,0 +1,9 @@
+# SHA-256 pins for the OFFICIAL elrepo-built el8 kernel-ml RPMs consumed in mirror mode (ADR-087).
+# Vetted: downloaded over HTTPS from the official elrepo mirror (coreix elrepo-archive-archive); each RPM
+# carries elrepo's GPG signature (key 51600989, signed 2026-01-23 = the 6.12.11 release). elrepo rotated
+# that key and no longer publishes it, so full GPG verify isn't possible — these pins are the integrity
+# anchor: build-rpm.sh fails the build if a downloaded RPM's SHA-256 does not match here, BEFORE re-signing
+# with the Datacosmos key. Update only when adding a new version, re-vetting the source.
+c0ac2c5501fe969d80fe2d1c04465ca795ec61baced7a180d2b62677250b5f22  kernel-ml-6.12.11-1.el8.elrepo.x86_64.rpm
+19e69e717dc6878ec72de45038f0b67886e3302207d3c0dd94d0309c20f74fdc  kernel-ml-core-6.12.11-1.el8.elrepo.x86_64.rpm
+8e691cff18e355afeedcc4025ff793d126a0cedcaadba8cbe883923541d6af79  kernel-ml-modules-6.12.11-1.el8.elrepo.x86_64.rpm

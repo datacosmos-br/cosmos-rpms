@@ -82,7 +82,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # raises the elrepo GitHub-API discovery rate limit
         run: |
           mkdir -p out
-          docker run --rm -v "$PWD/out:/out" \
+          docker run --rm -v "$PWD/out:/out" -v "$PWD/specs:/specs:ro" \
             -e PKG='${{ matrix.pkg }}' -e VERSION='${{ matrix.version }}' \
             -e ARCH='${{ matrix.arch }}' -e EL='${{ matrix.el }}' -e DIST='${{ matrix.dist }}' \
             -e MIRROR_BASE='${{ matrix.mirror }}' \

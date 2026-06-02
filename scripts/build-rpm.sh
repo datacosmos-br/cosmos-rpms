@@ -35,19 +35,23 @@ if [ -n "${MIRROR_BASE:-}" ]; then
   for p in kernel-ml kernel-ml-core kernel-ml-modules; do
     curl -fsSLO "${MIRROR_BASE}/${p}-${VERSION}-1.${EL}.elrepo.${ARCH}.rpm"
   done
-  # Trust model: HTTPS from the official elrepo mirror + the RPM carries a genuine elrepo signature; we
-  # then RE-SIGN with the Datacosmos key (the cluster's trust anchor — installer uses gpgcheck=1 w/ ours).
-  # elrepo ROTATED its signing key, so archived RPMs (e.g. 6.12.11, key 51600989) cannot be cryptographically
-  # verified against elrepo's CURRENT published key — we require a present elrepo signature, not a key match.
+  # INTEGRITY GATE (ADR-087): verify every downloaded RPM against the checked-in SHA-256 manifest BEFORE
+  # trusting/re-signing. The pins were vetted from the official elrepo mirror (HTTPS) + elrepo signature
+  # (rotated key 51600989, unpublishable now → no live GPG verify possible). A mismatch = tampered/swapped
+  # mirror → FATAL. We additionally require a present elrepo signature. Then the workflow re-signs with the
+  # Datacosmos key (the cluster's trust anchor, gpgcheck=1).
+  CHECKSUMS="${CHECKSUMS:-/specs/${PKG}/checksums-${EL}.sha256}"
+  [ -f "$CHECKSUMS" ] || { echo "FATAL: checksum manifest ${CHECKSUMS} missing — refusing to re-sign unpinned RPMs"; exit 1; }
+  if ! sha256sum -c --ignore-missing "$CHECKSUMS"; then
+    echo "FATAL: SHA-256 mismatch vs checked-in manifest ${CHECKSUMS} — tampered/swapped mirror; aborting"; exit 1
+  fi
   rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org 2>/dev/null || true
   for r in kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm; do
     sig="$(rpm -qpi "$r" 2>/dev/null | sed -n 's/.*Key ID \([0-9a-fA-F]\+\).*/\1/p')"
     [ -n "$sig" ] || { echo "FATAL: $r is UNSIGNED — not a genuine elrepo build"; exit 1; }
-    if rpm -K "$r" 2>/dev/null | grep -qiE 'signatures ok'; then
-      echo "OK $r — verifies against current elrepo key ($sig)"
-    else
-      echo "NOTE $r — elrepo-signed by rotated key $sig (HTTPS-mirror trust; re-signed downstream with Datacosmos key)"
-    fi
+    rpm -K "$r" 2>/dev/null | grep -qiE 'signatures ok' \
+      && echo "OK $r — SHA-256 pinned + verifies against current elrepo key ($sig)" \
+      || echo "OK $r — SHA-256 pinned + elrepo-signed (rotated key $sig); re-signed downstream"
   done
   cp kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm "$OUT"/
   echo "== mirror artifacts (elrepo-signed; workflow re-signs with Datacosmos key) ==" && ls -1 "$OUT"
