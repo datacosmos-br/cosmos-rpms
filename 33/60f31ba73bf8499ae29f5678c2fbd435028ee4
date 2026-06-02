@@ -1,0 +1,19 @@
+scripts/sign-rpm.sh
+  s_bef51d6362d23c::t_21926093230c49 23-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3360f31ba73bf8499ae29f5678c2fbd435028ee4",
+  "prompts": {},
+  "sessions": {
+    "s_bef51d6362d23c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e341287c-1216-4fc3-a400-f6e9d5e10220",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Zed <hi@zed.dev>"
+    }
+  }
+}
