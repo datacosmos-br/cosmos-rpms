@@ -41,6 +41,13 @@ curl -fsSL "${RAW}/kernel-ml/${cfg_el}/${donor_name}" -o donor.config
 # 2) pin the spec to VERSION (elrepo macro %define LKAver) + make the config Source arch-generic
 sed -ri "s/^(%define[[:space:]]+LKAver[[:space:]]+).*/\1${VERSION}/" ~/rpmbuild/SPECS/kernel-ml.spec
 sed -ri "s/^(Source1:[[:space:]]*config-%\{version\}-)x86_64/\1%{_target_cpu}/" ~/rpmbuild/SPECS/kernel-ml.spec
+# best-effort el8/aarch64: the el8 kernel-ml spec gates a few defines behind %ifarch x86_64, so they are
+# undefined on aarch64 and break the parse ("bad %if condition"). elrepo does NOT officially ship el8
+# aarch64 kernel-ml; pre-define the safe ones so the spec at least parses + builds. (x86_64 unaffected.)
+if [ "$ARCH" = "aarch64" ]; then
+  sed -i '1i %define zipmodules 0' ~/rpmbuild/SPECS/kernel-ml.spec
+  sed -i '1i %define with_vdso_install 0' ~/rpmbuild/SPECS/kernel-ml.spec
+fi
 
 # 3) all elrepo BuildRequires, exactly as the spec declares them
 dnf -y config-manager --set-enabled ol8_codeready_builder >/dev/null 2>&1 || true

@@ -113,6 +113,8 @@ jobs:
 
   release:
     needs: build
+    # publish whatever arches succeeded (e.g. x86_64) even if another (aarch64, el8-unsupported) failed.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +134,7 @@ jobs:
 
   pages:
     needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
