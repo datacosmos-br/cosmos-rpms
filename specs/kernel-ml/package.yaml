@@ -7,7 +7,9 @@ summary: >-
 el: el8
 dist: .el8.elrepo
 # upstream spec donor (elrepo/kernel). x86_64 config donor is el8; aarch64 has no el8 config -> el9 donor.
-specSource: elrepo/kernel:kernel-ml/el8/kernel-ml-7.0.spec
+# era-matched elrepo ref: el8 kernel-ml @ 6.12.11 (last 6.12 before 6.13) — the spec's %files/%install
+# layout matches the 6.12 kernel, unlike the current 7.0 spec. build-rpm.sh SPEC_REF default.
+specSource: elrepo/kernel@b2af198041d1b7c74e7669dc4ffc03ac1f3a946c:kernel-ml/el8/kernel-ml-6.12.spec
 versions:
   - "6.12.92"
 arches:

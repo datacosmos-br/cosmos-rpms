@@ -13,7 +13,11 @@ ARCH="${ARCH:-$(uname -m)}"
 EL="${EL:-el8}"
 DIST="${DIST:-.${EL}.elrepo}"
 OUT="${OUT:-/out}"
-RAW="https://raw.githubusercontent.com/elrepo/kernel/main"
+# Pin the elrepo source to the ERA-MATCHED ref: when el8 kernel-ml WAS 6.12 (before 6.13/7.0). Using the
+# 6.12-era spec + config means the spec's %files/%install layout matches the 6.12 kernel exactly — the
+# current 7.0 spec assumes 7.0's file layout and fails %install on a 6.12 build. Override via SPEC_REF.
+SPEC_REF="${SPEC_REF:-b2af198041d1b7c74e7669dc4ffc03ac1f3a946c}"   # el8 kernel-ml @ 6.12.11 (last 6.12)
+RAW="https://raw.githubusercontent.com/elrepo/kernel/${SPEC_REF}"
 SERIES="v$(printf '%s' "$VERSION" | cut -d. -f1).x"
 
 [ "$PKG" = "kernel-ml" ] || { echo "build-rpm: unknown PKG '$PKG'"; exit 2; }
@@ -25,14 +29,14 @@ mkdir -p "$OUT" ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
 # 1) elrepo spec + donor config — discovered dynamically (elrepo bumps versions/filenames over time).
 #    Build spec = el8 kernel-ml spec. Donor config: el8 has x86_64 only; aarch64 lives in el9.
 API="https://api.github.com/repos/elrepo/kernel/contents"
-ghls() { curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} "$1" | grep -oE '"name":[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/'; }
+ghls() { curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} "$1&ref=${SPEC_REF}" | grep -oE '"name":[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/'; }
 case "$ARCH" in
   x86_64)  cfg_el="$EL" ;;
   aarch64) cfg_el="el9" ;;   # el8 has no aarch64 config -> el9 donor
   *) echo "unsupported ARCH $ARCH"; exit 2 ;;
 esac
-spec_name="$(ghls "${API}/kernel-ml/${EL}" | grep -E '^kernel-ml-[0-9.]+\.spec$' | sort -V | tail -1)"
-donor_name="$(ghls "${API}/kernel-ml/${cfg_el}" | grep -E "^config-[0-9.]+-${ARCH}$" | sort -V | tail -1)"
+spec_name="$(ghls "${API}/kernel-ml/${EL}?" | grep -E '^kernel-ml-[0-9.]+\.spec$' | sort -V | tail -1)"
+donor_name="$(ghls "${API}/kernel-ml/${cfg_el}?" | grep -E "^config-[0-9.]+-${ARCH}$" | sort -V | tail -1)"
 [ -n "$spec_name" ] && [ -n "$donor_name" ] || { echo "FATAL: could not discover spec ($spec_name) / config ($donor_name)"; exit 1; }
 echo "spec=${spec_name} donor=${cfg_el}/${donor_name}"
 curl -fsSL "${RAW}/kernel-ml/${EL}/${spec_name}" -o ~/rpmbuild/SPECS/kernel-ml.spec
