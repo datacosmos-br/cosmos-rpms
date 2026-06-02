@@ -1,0 +1,24 @@
+scripts/build-rpm.sh
+  s_bef51d6362d23c::t_36f886355ba1fd 29-49
+specs/kernel-ml/package.yaml
+  s_bef51d6362d23c::t_8bf9db01a012be 9-13,16
+.github/workflows/build.yml
+  s_bef51d6362d23c::t_6f39450ad778c6 88
+  s_bef51d6362d23c::t_f46f968cd0fa52 50,56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b0667c6095ca96cf95bb2759e517b31bf1a5119c",
+  "prompts": {},
+  "sessions": {
+    "s_bef51d6362d23c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e341287c-1216-4fc3-a400-f6e9d5e10220",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Zed <hi@zed.dev>"
+    }
+  }
+}
