@@ -26,6 +26,27 @@ echo "== cosmos-rpms build: PKG=$PKG VERSION=$VERSION ARCH=$ARCH EL=$EL DIST=$DI
 work="$(mktemp -d)"; cd "$work"
 mkdir -p "$OUT" ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
 
+# --- MIRROR fast-path (ADR-087): if MIRROR_BASE is set, fetch the OFFICIAL elrepo-built RPMs from the
+# deep archive instead of compiling from source. Authenticity is guaranteed by elrepo's GPG signature
+# (verified here, transport-independent); the workflow then RE-SIGNS with the Datacosmos key. Minutes,
+# not ~90min. elrepo el8 is x86_64-only, so aarch64 will 404 here (best-effort, fails fast). ---
+if [ -n "${MIRROR_BASE:-}" ]; then
+  echo "== MIRROR mode: ${MIRROR_BASE} =="
+  for p in kernel-ml kernel-ml-core kernel-ml-modules; do
+    curl -fsSLO "${MIRROR_BASE}/${p}-${VERSION}-1.${EL}.elrepo.${ARCH}.rpm"
+  done
+  # verify the elrepo signature (authentic upstream build) BEFORE we trust/re-sign
+  rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+  for r in kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm; do
+    rpm -K "$r"
+    rpm -K "$r" | grep -qiE 'pgp.*ok|signatures ok|digests signatures ok' || { echo "FATAL: elrepo signature verify FAILED for $r"; exit 1; }
+  done
+  cp kernel-ml*-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm "$OUT"/
+  echo "== mirror artifacts (elrepo-signed; workflow re-signs with Datacosmos key) ==" && ls -1 "$OUT"
+  ls "$OUT"/kernel-ml-"${VERSION}"-1."${EL}".elrepo."${ARCH}".rpm >/dev/null
+  exit 0
+fi
+
 # 1) elrepo spec + donor config — discovered dynamically (elrepo bumps versions/filenames over time).
 #    Build spec = el8 kernel-ml spec. Donor config: el8 has x86_64 only; aarch64 lives in el9.
 API="https://api.github.com/repos/elrepo/kernel/contents"

@@ -6,12 +6,14 @@ summary: >-
   wedges cilium/coroot eBPF). Rebuilt from the elrepo kernel-ml spec + kernel.org tarball.
 el: el8
 dist: .el8.elrepo
-# upstream spec donor (elrepo/kernel). x86_64 config donor is el8; aarch64 has no el8 config -> el9 donor.
-# era-matched elrepo ref: el8 kernel-ml @ 6.12.11 (last 6.12 before 6.13) — the spec's %files/%install
-# layout matches the 6.12 kernel, unlike the current 7.0 spec. build-rpm.sh SPEC_REF default.
+# PRIMARY source = mirror: the OFFICIAL elrepo-built el8 kernel-ml 6.12.11 RPMs from the deep archive
+# (last 6.12 elrepo shipped for el8). build-rpm.sh downloads + verifies elrepo's GPG sig, the workflow
+# re-signs with the Datacosmos key. Instant vs ~90min from-scratch. To build a version elrepo never
+# shipped (e.g. 6.12.92), unset `mirror` and build-rpm.sh compiles from the era-matched spec (SPEC_REF).
+mirror: https://mirrors.coreix.net/elrepo-archive-archive/kernel/el8/x86_64/RPMS
 specSource: elrepo/kernel@b2af198041d1b7c74e7669dc4ffc03ac1f3a946c:kernel-ml/el8/kernel-ml-6.12.spec
 versions:
-  - "6.12.92"
+  - "6.12.11"
 arches:
   - x86_64
   - aarch64

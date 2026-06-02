@@ -47,12 +47,13 @@ jobs:
           items='[]'
           for pf in specs/*/package.yaml; do
             pkg=$(yq -r '.package' "$pf"); el=$(yq -r '.el' "$pf"); dist=$(yq -r '.dist' "$pf")
+            mirror=$(yq -r '.mirror // ""' "$pf")
             [ -n "$ONLY_PKG" ] && [ "$ONLY_PKG" != "$pkg" ] && continue
             for v in $(yq -r '.versions[]' "$pf"); do
               [ -n "$ONLY_VER" ] && [ "$ONLY_VER" != "$v" ] && continue
               for a in $(yq -r '.arches[]' "$pf"); do
                 runner=ubuntu-latest; [ "$a" = "aarch64" ] && runner=ubuntu-24.04-arm
-                items=$(echo "$items" | yq -o=json -I=0 ". + [{\"pkg\":\"$pkg\",\"version\":\"$v\",\"arch\":\"$a\",\"el\":\"$el\",\"dist\":\"$dist\",\"runner\":\"$runner\"}]")
+                items=$(echo "$items" | yq -o=json -I=0 ". + [{\"pkg\":\"$pkg\",\"version\":\"$v\",\"arch\":\"$a\",\"el\":\"$el\",\"dist\":\"$dist\",\"runner\":\"$runner\",\"mirror\":\"$mirror\"}]")
               done
             done
           done
@@ -84,6 +85,7 @@ jobs:
           docker run --rm -v "$PWD/out:/out" \
             -e PKG='${{ matrix.pkg }}' -e VERSION='${{ matrix.version }}' \
             -e ARCH='${{ matrix.arch }}' -e EL='${{ matrix.el }}' -e DIST='${{ matrix.dist }}' \
+            -e MIRROR_BASE='${{ matrix.mirror }}' \
             -e GITHUB_TOKEN \
             cosmos-rpms-builder
 
