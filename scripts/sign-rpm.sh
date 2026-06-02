@@ -20,6 +20,14 @@ rpm --define "_gpg_name ${GPG_KEY_NAME}" \
     --define "__gpg_sign_cmd %{__gpg} gpg --batch --no-armor --pinentry-mode loopback ${PASS:+--passphrase ${PASS}} --no-secmem-warning -u \"%{_gpg_name}\" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}" \
     --addsign "$@"
 
-# verify
-for r in "$@"; do rpm -K "$r"; done
+# verify against OUR key: rpm uses its own keyring, so import our public key (derived from the imported
+# private key) before checking. Each RPM must now report a good Datacosmos signature.
+gpg --batch --export --armor "$GPG_KEY_NAME" > "$GNUPGHOME/our.pub"
+rpm --import "$GNUPGHOME/our.pub"
+for r in "$@"; do
+  out="$(LC_ALL=C rpm -Kv "$r" 2>&1)"
+  echo "$out" | grep -qE 'NOKEY|NOT OK|MISSING KEYS' && { echo "FATAL: re-sign verify FAILED for $r:"; echo "$out"; rm -rf "$GNUPGHOME"; exit 1; }
+  echo "$out" | grep -qE '(RSA|DSA)/SHA[0-9]+ Signature.*: OK' || { echo "FATAL: no Datacosmos signature on $r:"; echo "$out"; rm -rf "$GNUPGHOME"; exit 1; }
+  echo "OK $r — signed + verified with Datacosmos key"
+done
 rm -rf "$GNUPGHOME"
