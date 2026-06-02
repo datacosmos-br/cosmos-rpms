@@ -22,14 +22,21 @@ echo "== cosmos-rpms build: PKG=$PKG VERSION=$VERSION ARCH=$ARCH EL=$EL DIST=$DI
 work="$(mktemp -d)"; cd "$work"
 mkdir -p "$OUT" ~/rpmbuild/SOURCES ~/rpmbuild/SPECS
 
-# 1) elrepo spec (el8 kernel-ml). Donor config: el8 has x86_64 only; aarch64 lives in el9.
-curl -fsSL "${RAW}/kernel-ml/${EL}/kernel-ml-7.0.spec" -o ~/rpmbuild/SPECS/kernel-ml.spec
+# 1) elrepo spec + donor config — discovered dynamically (elrepo bumps versions/filenames over time).
+#    Build spec = el8 kernel-ml spec. Donor config: el8 has x86_64 only; aarch64 lives in el9.
+API="https://api.github.com/repos/elrepo/kernel/contents"
+ghls() { curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} "$1" | grep -oE '"name":[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/'; }
 case "$ARCH" in
-  x86_64)  cfg_el="el8"; donor="config-7.0.10-x86_64" ;;
-  aarch64) cfg_el="el9"; donor="config-7.0.10-aarch64" ;;   # el8 has no aarch64 config -> el9 donor
+  x86_64)  cfg_el="$EL" ;;
+  aarch64) cfg_el="el9" ;;   # el8 has no aarch64 config -> el9 donor
   *) echo "unsupported ARCH $ARCH"; exit 2 ;;
 esac
-curl -fsSL "${RAW}/kernel-ml/${cfg_el}/${donor}" -o donor.config
+spec_name="$(ghls "${API}/kernel-ml/${EL}" | grep -E '^kernel-ml-[0-9.]+\.spec$' | sort -V | tail -1)"
+donor_name="$(ghls "${API}/kernel-ml/${cfg_el}" | grep -E "^config-[0-9.]+-${ARCH}$" | sort -V | tail -1)"
+[ -n "$spec_name" ] && [ -n "$donor_name" ] || { echo "FATAL: could not discover spec ($spec_name) / config ($donor_name)"; exit 1; }
+echo "spec=${spec_name} donor=${cfg_el}/${donor_name}"
+curl -fsSL "${RAW}/kernel-ml/${EL}/${spec_name}" -o ~/rpmbuild/SPECS/kernel-ml.spec
+curl -fsSL "${RAW}/kernel-ml/${cfg_el}/${donor_name}" -o donor.config
 
 # 2) pin the spec to VERSION (elrepo macro %define LKAver) + make the config Source arch-generic
 sed -ri "s/^(%define[[:space:]]+LKAver[[:space:]]+).*/\1${VERSION}/" ~/rpmbuild/SPECS/kernel-ml.spec
