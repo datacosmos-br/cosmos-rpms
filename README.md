@@ -37,6 +37,19 @@ Public signing key: `https://datacosmos-br.github.io/cosmos-rpms/RPM-GPG-KEY-dat
    artifact-generation scripts).
 3. Push to `main` (or run the workflow) — CI builds, signs, releases, publishes.
 
+## Known limitations
+
+- **`kernel-ml` aarch64 on el8 is not currently shipped.** elrepo has no upstream el8 aarch64 kernel-ml
+  spec/config (the el8 spec is x86_64-only; aarch64 lives in el9 with an el9 file layout). The arm64
+  matrix leg is **best-effort** and currently fails at the el8 spec's arch-gated `%prep`/`%install`; the
+  release/pages jobs run `if: !cancelled()` so **x86_64 publishes regardless**. Producing a real el8
+  aarch64 kernel needs porting the el8 spec for arm + validating boot on an actual arm node pool — there
+  are none yet (the OKE fleet is `VM.Standard.E6.Flex`, x86_64). Tracked for when arm nodes are added.
+- **Era-matched elrepo spec.** Because elrepo's *current* spec targets the latest mainline (7.0+), whose
+  `%files` layout differs from 6.12, the kernel build pins `SPEC_REF` to elrepo's **6.12-era** spec
+  (`scripts/build-rpm.sh`). Bumping to a newer minor (6.13+, 7.x) requires re-pinning `SPEC_REF` to that
+  era's elrepo commit.
+
 ## Trust
 
 All packages and repo metadata (`repomd.xml`) are GPG-signed. Verify with the published public key.
