@@ -66,6 +66,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
+    # elrepo's el8 kernel-ml mirror is x86_64-only, so the aarch64 mirror leg 404s by
+    # design (build-rpm.sh "best-effort, fails fast"). Mark only that leg non-fatal so the
+    # workflow stays green — the release job already publishes whatever arches succeeded.
+    continue-on-error: ${{ matrix.arch == 'aarch64' && matrix.mirror != '' }}
     steps:
       - uses: actions/checkout@v4
 
